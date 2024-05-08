@@ -16,7 +16,16 @@ class CustomLinear(nn.Linear):
 
 class CustomMLP(nn.Module):
     """
-    A multi-layer perceptron (MLP) module for the ConsisGAD model.
+    A multi-layer perceptron (MLP) module for the ConsisG4D model.
+
+    The MLP module consists of:
+        - an input layer of linear transformation, shape `(in_dim, hid_dim)`
+        - activation function ELU
+        - a normalization layer with normalized shape `(hid_dim)`
+        - a dropout layer with dropout rate `p`
+        - an output layer of linear transformation, shape `(hid_dim, out_dim)`
+
+        If `final_act` is set to `True`, the activation function and dropout is applied at the end.
     """
 
     def __init__(self, in_dim: int, out_dim: int, 
