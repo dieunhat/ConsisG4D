@@ -20,15 +20,6 @@ class SoftAttentionDrop(nn.Module): # learnable masking module
         self.mask_projection = nn.Linear(hidden_dim, hidden_dim, bias=False)
         self.mask_projection.weight.data.fill_(0)
         # self.epsilon = epsilon
-        
-    def forward(self, feature, in_eval=False):
-        mask = self.mask_projection(feature) # attention function   
-        sharpened_mask = self.sharpen(mask, self.drop_ratio, mask.shape[1], self.temp)
-
-        if in_eval:
-            sharpened_mask = sharpened_mask.detach()
-        
-        return feature * sharpened_mask
     
     def sharpen(self, input, drop_ratio, input_dims, temperature):
         """ 
@@ -50,6 +41,15 @@ class SoftAttentionDrop(nn.Module): # learnable masking module
             input_ += y * m
         
         return (1. - input_)
+    
+    def forward(self, feature, in_eval=False):
+        mask = self.mask_projection(feature) # attention function   
+        sharpened_mask = self.sharpen(mask, self.drop_ratio, mask.shape[1], self.temp)
+
+        if in_eval:
+            sharpened_mask = sharpened_mask.detach()
+        
+        return feature * sharpened_mask
     
 def fixed_augmentation(graph, seed_nodes, sampler, aug_type, epsilon=0.0):
     # assert augmentation in ['dropout', 'dropnode', 'dropedge', 'replace', 'drophidden', 'none']

@@ -14,3 +14,10 @@ class CustomBatchNorm1d(nn.BatchNorm1d):
         self.track_running_stats = update_running_stats
         return super(CustomBatchNorm1d, self).forward(input)
     
+def l2_regularization(model):
+    l2_reg = torch.tensor(0., requires_grad=True)
+    for key, value in model.named_parameters():
+        if len(value.shape) > 1 and 'weight' in key:
+            l2_reg = l2_reg + torch.sum(value ** 2) * 0.5
+    return l2_reg
+    
