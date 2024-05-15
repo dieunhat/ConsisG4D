@@ -43,7 +43,7 @@ def find_best_f1(probs: np.ndarray, labels: np.ndarray):
     return best_f1, best_thre
 
 
-def eval_pred(pred: torch.Tensor, target: torch.Tensor):
+def calculate_metrics(pred: torch.Tensor, target: torch.Tensor):
     """ Evaluate the prediction of the model
 
     ---------
