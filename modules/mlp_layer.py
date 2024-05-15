@@ -31,6 +31,7 @@ class CustomMLP(nn.Module):
     def __init__(self, in_dim: int, out_dim: int, 
                  hid_dim: int = 64, p: float = 0.0, final_act: bool = True):
         """ Initialize the MLP module.
+
         Args:
             `in_dim`: the input dimension
             `out_dim`: the output dimension
@@ -49,8 +50,10 @@ class CustomMLP(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Forward pass of the MLP module.
+
         Args:
             `x`: the input tensor of shape `(batch_size, in_dim)`
+            
         Returns:
             `x`: the output tensor of shape `(batch_size, out_dim)`
         """
