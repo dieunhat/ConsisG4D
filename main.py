@@ -4,7 +4,6 @@ import sys
 import yaml
 import time
 import torch
-import argparse
 import numpy as np
 from torch import optim
 from train import nll_loss, training_paradigm
@@ -12,6 +11,7 @@ from validate_test import validate_and_test
 from modules.model import GNN_backbone
 from modules.augment import SoftAttentionDrop
 from modules.dataloader import get_index_loader_test
+import wandb
 
 def create_model(config, e_ts):
     if config['model'] == 'backbone':
@@ -24,8 +24,8 @@ def create_model(config, e_ts):
             
     return tmp_model
 
-def store_model(my_model):
-    file_path = os.path.join('/kaggle/working/model.pth')
+def store_model(my_model, name, config):
+    file_path = os.path.join(config['model-path'], f"{name}.pth")
     torch.save(my_model.state_dict(), file_path)
 
 def run_model(config):
@@ -36,6 +36,8 @@ def run_model(config):
                                                                                            training_ratio=config['training-ratio'],
                                                                                            shuffle_train=config['shuffle-train'], 
                                                                                            to_homo=config['to-homo'])
+    
+    print("Done getting loader")
     graph = graph.to(config['device'])
     
     config['node-in-dim'] = graph.ndata['feature'].shape[1]
@@ -58,46 +60,79 @@ def run_model(config):
     task_loss = nll_loss
     
     # define the smallest floating point number
-    best_val = sys.float_info.min
+    best_val_roc = sys.float_info.min
+    best_val_pr = sys.float_info.min
+    best_val_f1 = sys.float_info.min
     
-    for _ in range(config['epochs']):
+    for i in range(config['epochs']):
+        print(f"Epoch {i+1}/{config['epochs']}\n")
         train_epoch(my_model, task_loss, graph, label_loader, unlabel_loader, optimizer, augmentor, config)
         val_results, test_results = validate_and_test(my_model, graph, valid_loader, test_loader, sampler, config)
         
-        if val_results['auc-roc'] > best_val:
-            best_val = val_results['auc-roc']
-            test_in_best_val = test_results
+        if val_results['auc-pr'] > best_val_pr:
+            best_val_pr = val_results['auc-pr']
+            best_test_pr = test_results
             
             if config['store-model']:
-                store_model(my_model)
+                store_model(my_model, "pr" ,config)
+
+        if val_results['macro-f1'] > best_val_f1:
+            best_val_f1 = val_results['macro-f1']
+            best_test_f1 = test_results
+            
+            if config['store-model']:
+                store_model(my_model, "f1" ,config)
+
+        if val_results['auc-roc'] > best_val_roc:
+            best_val_roc = val_results['auc-roc']
+            best_test_roc = test_results
+            
+            if config['store-model']:
+                store_model(my_model, "roc" ,config)
                 
-    return list(test_in_best_val.values())
+    return list(best_test_pr.values()), list(best_test_f1.values()), list(best_test_roc.values())
 
 def get_config(config_path="config.yml"):
     with open(config_path, "r") as setting:
         config = yaml.load(setting, Loader=yaml.FullLoader)
     return config
 
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
+def print_result(results):
+    print(f"AUC-ROC: {results[0]}\nAUC-PR: {results[1]}\nMacro-F1: {results[-1]}\n")
+          
 if __name__ == "__main__":
     start_time = time.time()
         
     config = get_config()
-    
     if torch.cuda.is_available():
         config['device'] = torch.device('cuda:%d'%(config['device']))
     else:
         config['device'] = torch.device('cpu')
     
-    final_results = []
-    for r in range(config['runs']):
-        final_results.append(run_model(config))
+    print("Device: ", config['device'])
+    set_seed(config['seed'])
 
-    final_results = np.array(final_results)
-    mean_results = np.mean(final_results, axis=0)
-    std_results = np.std(final_results, axis=0)
+    # init wandb
+    wandb.init(project='amazon-fraud-detection', 
+               entity='dnhat',
+               config={
+                   "runs": config['runs'],
+                    "epochs": config['epochs'],
+                    "lr": config['lr'],
+               }
+               )
+    
+    final_result_pr, final_result_f1, final_result_roc = run_model(config)
+    print(f"Test results (tuned by AUC-PR): {print_result(final_result_pr)}\n-----------------")
+    print(f"Test results (tuned by Macro-F1): {print_result(final_result_f1)}\n-----------------")
+    print(f"Test results (tuned by AUC-ROC): {print_result(final_result_roc)}\n-----------------")
 
-    print(mean_results)
-    print(std_results)
     print('total time: ', time.time()-start_time)
     

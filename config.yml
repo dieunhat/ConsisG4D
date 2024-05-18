@@ -29,3 +29,5 @@ trainable-optim: 'adam'
 trainable-lr: 0.01
 num_iters: 128
 store-model: True
+model-path: "./output"
+seed: 42

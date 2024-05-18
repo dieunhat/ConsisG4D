@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import dgl
+import wandb
 
 from modules.evaluation import calculate_metrics, accuracy_score, recall_score, precision_score, f1_score
 
@@ -88,6 +89,9 @@ def validate_and_test(model: nn.Module,  graph: dgl.DGLGraph,
     val_results['precision'] = val_p
     val_results['macro-f1'] = val_f1
 
+    wandb.log({"val_auc_roc": val_roc,
+               "val_auc_pr": val_pr,
+               "val_macro_f1": val_f1,})
 
     test_results = {}
     test_pred, test_true = get_model_pred(model, graph,
@@ -110,5 +114,9 @@ def validate_and_test(model: nn.Module,  graph: dgl.DGLGraph,
     test_results['precision'] = precision_score(test_true, guessed_label)
     test_results['macro-f1'] = f1_score(test_true,
                                         guessed_label, average='macro')
+    
+    wandb.log({"test_auc_roc": test_roc,
+                "test_auc_pr": test_pr,
+                "test_macro_f1": test_results['macro-f1'],})
 
     return val_results, test_results

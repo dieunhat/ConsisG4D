@@ -1,6 +1,17 @@
 # ConsisG4D
 
-- Các hyperparameters nằm trong file config.yml
-- Khi chạy bằng CPU/GPU cần tải phiên bản torch và dgl tương ứng
-- Chạy hàm train trên kaggle bằng lệnh !python link-to-main.py
-- Hiện tại checkpoint được lưu theo đường dẫn của kaggle.
+Install required packages by running the following command:
+```bash
+pip3 install -r requirements.txt
+``` 
+
+Wandb setup:
+```bash
+wandb login
+```
+Enter the API key when prompted and replace the 'entity' in the `wandb.init()` function with your username (in `main.py`).
+
+To start training, execute the following command:
+```bash
+python3 main.py
+```

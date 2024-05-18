@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from sklearn.metrics import f1_score, accuracy_score, recall_score, roc_auc_score, precision_score, average_precision_score
 from scikitplot.helpers import binary_ks_curve
+import wandb
 
 
 def find_best_f1(probs: np.ndarray, labels: np.ndarray):

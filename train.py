@@ -1,6 +1,7 @@
 from modules.augment import fixed_augmentation
 from modules.utils import high_quality_nodes
 from modules.regularization import l2_regularization
+import wandb
 
 import torch
 import torch.nn.functional as F
@@ -47,6 +48,7 @@ def training_paradigm(model, loss_func, graph,
     unlabel_loader_iter = iter(unlabel_loader)
     label_loader_iter = iter(label_loader)
 
+    losses = []
     for idx in range(num_iters):  # iterate over batches of dataloader
         try:
             label_idx = label_loader_iter.__next__()
@@ -116,6 +118,14 @@ def training_paradigm(model, loss_func, graph,
             total_loss = config['consis-weight'] * consistency_loss - \
                 diversity_loss + config['trainable-weight-decay'] * \
                 l2_regularization(attn_drop)
+            
+            print(f"Consistency Loss: {consistency_loss.item()}")
+            print(f"Diversity Loss: {diversity_loss.item()}")
+            print(f"Total Loss: {total_loss.item()}")
+
+            wandb.log({'train-augconsis-loss': consistency_loss.item(),
+                          'train-diversity-loss': diversity_loss.item(),
+                          'train-total-loss': total_loss.item()})
 
             ad_optim.zero_grad()
             total_loss.backward()
@@ -162,6 +172,12 @@ def training_paradigm(model, loss_func, graph,
         loss = sup_loss + unsup_loss + \
             config['weight-decay'] * l2_regularization(model)
 
+        losses.append(loss.item())
+
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
+    mean_loss = sum(losses) / len(losses)
+    print(f"Consistency training loss: {mean_loss}")
+    wandb.log({'train-consis-loss': mean_loss})
