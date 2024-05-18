@@ -1,5 +1,14 @@
 # ConsisG4D
 
+Current result on test set
+# create table with 3 columns and 5 rows
+| Metric | Paper | Our |
+| --- | --- | --- |
+| AUC-ROC | 93.91 | 91.897 |
+| AUC-PR | 83.33 | 79.98 |
+| Macro-F1 | 90.03 | 88.67 |
+| Loss | - | 0.153 |
+
 Install required packages by running the following command:
 ```bash
 pip3 install -r requirements.txt

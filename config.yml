@@ -22,9 +22,9 @@ training-ratio: 1
 shuffle-train: True
 to-homo: False
 optim: 'adam'
-lr: 0.001
+lr: 0.00001
 runs: 1
-epochs: 30
+epochs: 20
 trainable-optim: 'adam'
 trainable-lr: 0.01
 num_iters: 128

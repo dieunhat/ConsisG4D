@@ -107,7 +107,7 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 def print_result(results):
-    print(f"AUC-ROC: {results[0]}\nAUC-PR: {results[1]}\nMacro-F1: {results[-1]}\n")
+    print(f"AUC-ROC: {results[1]}\nAUC-PR: {results[2]}\nMacro-F1: {results[-1]}\nLoss{results[0]}")
           
 if __name__ == "__main__":
     start_time = time.time()
