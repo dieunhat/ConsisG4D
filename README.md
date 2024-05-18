@@ -1,7 +1,4 @@
 # ConsisG4D
-
-Current result on test set
-# create table with 3 columns and 5 rows
 | Metric | Paper | Our |
 | --- | --- | --- |
 | AUC-ROC | 93.91 | 91.897 |
