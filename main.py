@@ -121,6 +121,9 @@ if __name__ == "__main__":
     print("Device: ", config['device'])
     set_seed(config['seed'])
 
+    if not os.path.exists(config['model-path']):
+        os.makedirs(config['model-path'])
+    
     # init wandb
     wandb.init(project='amazon-fraud-detection', 
                entity='dnhat',
