@@ -24,10 +24,11 @@ to-homo: False
 optim: 'adam'
 lr: 0.001
 runs: 1
-epochs: 10
+epochs: 30
 trainable-optim: 'adam'
 trainable-lr: 0.01
 num_iters: 128
 store-model: True
 model-path: "./output"
 seed: 42
+early-stop: True

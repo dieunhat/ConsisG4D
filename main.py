@@ -6,11 +6,13 @@ import time
 import torch
 import numpy as np
 from torch import optim
-from train import nll_loss, training_paradigm
+from train import training_paradigm
 from validate_test import validate_and_test
 from modules.model import GNN_backbone
 from modules.augment import SoftAttentionDrop
 from modules.dataloader import get_index_loader_test
+from modules.utils import EarlyStopper
+from modules.evaluation import nll_loss
 import wandb
 
 def create_model(config, e_ts):
@@ -37,7 +39,6 @@ def run_model(config):
                                                                                            shuffle_train=config['shuffle-train'], 
                                                                                            to_homo=config['to-homo'])
     
-    print("Done getting loader")
     graph = graph.to(config['device'])
     
     config['node-in-dim'] = graph.ndata['feature'].shape[1]
@@ -48,6 +49,10 @@ def run_model(config):
 
     # define optimizer
     optimizer = optim.Adam(my_model.parameters(), lr=config['lr'], weight_decay=0.0)
+
+    # stopper
+    if config['early-stop']:
+        stopper = EarlyStopper(4, 1e-4)
     
     sampler = dgl.dataloading.MultiLayerFullNeighborSampler(config['num-layers'])
 
@@ -61,27 +66,24 @@ def run_model(config):
     
     # define the smallest floating point number
     best_val_roc = sys.float_info.min
-    best_val_pr = sys.float_info.min
-    best_val_f1 = sys.float_info.min
+    best_val_loss = sys.float_info.min
     
+    val_losses = []
     for i in range(config['epochs']):
         print(f"Epoch {i+1}/{config['epochs']}\n")
-        train_epoch(my_model, task_loss, graph, label_loader, unlabel_loader, optimizer, augmentor, config)
+        train_epoch(i, my_model, task_loss, graph, label_loader, unlabel_loader, optimizer, augmentor, config)
         val_results, test_results = validate_and_test(my_model, graph, valid_loader, test_loader, sampler, config)
         
-        if val_results['auc-pr'] > best_val_pr:
-            best_val_pr = val_results['auc-pr']
-            best_test_pr = test_results
-            
-            if config['store-model']:
-                store_model(my_model, "pr" ,config)
+        val_losses.append(val_results['loss'])
+        if stopper.early_stop(val_losses[-1]):
+            break
 
-        if val_results['macro-f1'] > best_val_f1:
-            best_val_f1 = val_results['macro-f1']
-            best_test_f1 = test_results
+        if val_results['loss'] > best_val_loss:
+            best_val_loss = val_results['loss']
+            best_test_loss = test_results
             
             if config['store-model']:
-                store_model(my_model, "f1" ,config)
+                store_model(my_model, "loss" ,config)
 
         if val_results['auc-roc'] > best_val_roc:
             best_val_roc = val_results['auc-roc']
@@ -90,7 +92,7 @@ def run_model(config):
             if config['store-model']:
                 store_model(my_model, "roc" ,config)
                 
-    return list(best_test_pr.values()), list(best_test_f1.values()), list(best_test_roc.values())
+    return list(best_test_loss.values()), list(best_test_roc.values())
 
 def get_config(config_path="config.yml"):
     with open(config_path, "r") as setting:
@@ -129,9 +131,8 @@ if __name__ == "__main__":
                }
                )
     
-    final_result_pr, final_result_f1, final_result_roc = run_model(config)
-    print(f"Test results (tuned by AUC-PR): {print_result(final_result_pr)}\n-----------------")
-    print(f"Test results (tuned by Macro-F1): {print_result(final_result_f1)}\n-----------------")
+    final_result_loss, final_result_roc = run_model(config)
+    print(f"Test results (tuned by loss): {print_result(final_result_loss)}\n-----------------")
     print(f"Test results (tuned by AUC-ROC): {print_result(final_result_roc)}\n-----------------")
 
     print('total time: ', time.time()-start_time)

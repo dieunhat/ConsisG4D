@@ -63,6 +63,7 @@ def get_index_loader_test(name: str, batch_size: int, unlabel_ratio: int = 1, tr
     unlabeled_nids = np.concatenate([valid_nids, test_nids, train_nids])
 
     power = 10 if name == 'tfinance' else 16
+    print(f"Number of labeled training nodes: {len(labeled_nids)}\nNumber of validation nodes: {len(valid_nids)}\nNumber of test nodes: {len(test_nids)}\n")
     
     valid_loader = torch_dataloader(valid_nids, batch_size = 2**power, shuffle = False, drop_last = False, num_workers = 4)
     test_loader = torch_dataloader(test_nids, batch_size = 2**power, shuffle = False, drop_last = False, num_workers = 4)

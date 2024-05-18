@@ -7,7 +7,6 @@ import wandb
 
 from modules.evaluation import calculate_metrics, accuracy_score, recall_score, precision_score, f1_score
 
-
 def get_model_pred(model: nn.Module, graph: dgl.DGLGraph,
                    data_loader: DataLoader,
                    sampler: dgl.dataloading.MultiLayerFullNeighborSampler,
@@ -49,7 +48,7 @@ def get_model_pred(model: nn.Module, graph: dgl.DGLGraph,
 
         # exponential the prediction: convert from log-probability to probability
         # but only for the second dimension: the positive class (fraud class)
-        pred_list = pred_list.exp()[:, 1]
+        # pred_list = pred_list.exp()[:, 1]
 
     return pred_list, label_list
 
@@ -79,8 +78,9 @@ def validate_and_test(model: nn.Module,  graph: dgl.DGLGraph,
     val_pred, val_true = get_model_pred(model, graph,
                                          valid_loader, sampler, args)
 
-    val_roc, val_pr, val_ks, val_acc, val_r, val_p, val_f1, val_thre = calculate_metrics(
+    val_loss, val_roc, val_pr, val_ks, val_acc, val_r, val_p, val_f1, val_thre = calculate_metrics(
         val_pred, val_true)
+    val_results['loss'] = val_loss
     val_results['auc-roc'] = val_roc
     val_results['auc-pr'] = val_pr
     val_results['ks-statistics'] = val_ks
@@ -89,19 +89,23 @@ def validate_and_test(model: nn.Module,  graph: dgl.DGLGraph,
     val_results['precision'] = val_p
     val_results['macro-f1'] = val_f1
 
-    wandb.log({"val_auc_roc": val_roc,
+    wandb.log({"val_loss": val_loss,
+                "val_auc_roc": val_roc,
                "val_auc_pr": val_pr,
                "val_macro_f1": val_f1,})
-
+    print(f"Validation loss: {val_loss}")
     test_results = {}
     test_pred, test_true = get_model_pred(model, graph,
                                            test_loader, sampler, args)
-
-    test_roc, test_pr, test_ks, _, _, _, _, _ = calculate_metrics(
+    
+    test_loss, test_roc, test_pr, test_ks, _, _, _, _, _ = calculate_metrics(
         test_pred, test_true)
+    test_results['loss'] = test_loss
     test_results['auc-roc'] = test_roc
     test_results['auc-pr'] = test_pr
     test_results['ks-statistics'] = test_ks
+
+    test_pred = test_pred.exp()[:, 1]
 
     test_pred = test_pred.cpu().numpy()
     test_true = test_true.cpu().numpy()
@@ -115,7 +119,8 @@ def validate_and_test(model: nn.Module,  graph: dgl.DGLGraph,
     test_results['macro-f1'] = f1_score(test_true,
                                         guessed_label, average='macro')
     
-    wandb.log({"test_auc_roc": test_roc,
+    wandb.log({"test_loss": test_loss,
+                "test_auc_roc": test_roc,
                 "test_auc_pr": test_pr,
                 "test_macro_f1": test_results['macro-f1'],})
 

@@ -2,9 +2,29 @@ import torch
 import numpy as np
 from sklearn.metrics import f1_score, accuracy_score, recall_score, roc_auc_score, precision_score, average_precision_score
 from scikitplot.helpers import binary_ks_curve
+import torch.nn.functional as F
 import wandb
 
+def nll_loss(pred, target, pos_w: float=1.0, reduction='mean', device='cuda'):
+    """
+    Args:
+        pred: prediction tensor
+        target: target tensor
+        pos_w: positive weight
+        reduction: reduction method
+    Returns:
+        loss_value: loss value
+    """
+    weight_tensor = torch.tensor([1., pos_w]).to(pred.device)
+    loss_value = F.nll_loss(pred, target.long(), weight=weight_tensor,
+                            reduction=reduction)
 
+    if device == 'cuda' or device == 'mps':
+        return loss_value
+    else:
+        loss_value = loss_value.cpu().detach().numpy()
+        return loss_value
+    
 def find_best_f1(probs: np.ndarray, labels: np.ndarray):
     """ Find the best F1 score and the best threshold to achieve the best F1 score
 
@@ -63,6 +83,11 @@ def calculate_metrics(pred: torch.Tensor, target: torch.Tensor):
         - `best_f1`: Best F1 score
         - `best_thre`: Best threshold to achieve the best F1 score
     """
+    
+    # Calculate loss
+    loss = nll_loss(pred, target, pos_w=1.0, reduction='mean', device='cuda')
+
+    pred = pred.exp()[:, 1]
 
     # Convert the tensors to numpy arrays
     np_pred = pred.cpu().detach().numpy()
@@ -84,4 +109,4 @@ def calculate_metrics(pred: torch.Tensor, target: torch.Tensor):
     recall = recall_score(np_target, predict_labels)
     precision = precision_score(np_target, predict_labels)
 
-    return auc_roc, auc_pr, ks_statistics, accuracy, recall, precision, best_f1, best_threshold
+    return loss, auc_roc, auc_pr, ks_statistics, accuracy, recall, precision, best_f1, best_threshold
