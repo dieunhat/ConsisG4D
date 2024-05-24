@@ -58,6 +58,10 @@ def run_model(config):
 
     train_epoch = training_paradigm
     attn_drop = SoftAttentionDrop(config).to(config['device'])
+    
+    for name, param in attn_drop.named_parameters():
+        if param.requires_grad:
+            print(name, param.data)
 
     ad_optim = optim.Adam(attn_drop.parameters(), lr=config['trainable-lr'], weight_decay=0.0)
     augmentor = (sampler, attn_drop, ad_optim)

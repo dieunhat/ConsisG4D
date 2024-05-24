@@ -4,7 +4,7 @@ normal-th: 5
 fraud-th: 85
 consis-weight: 1.5
 weight-decay: 0.00001
-trainable-weight-decay: 0.0
+trainable-weight-decay: 0.001
 model: 'backbone'
 hidden-dim: 64
 num-layers: 1
@@ -32,3 +32,4 @@ store-model: True
 model-path: "./output"
 seed: 42
 early-stop: True
+warm-up: -1

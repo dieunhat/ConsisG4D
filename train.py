@@ -21,13 +21,13 @@ def training_paradigm(epoch, model, loss_func, graph,
         - weight-decay: weight decay
     """
     model.train()
-    num_iters = config['num_iters']  # This equals to len(dl) / batch_size
+    num_iters = config['num_iters'] 
     sampler, attn_drop, ad_optim = augmentor
 
     unlabel_loader_iter = iter(unlabel_loader)
     label_loader_iter = iter(label_loader)
 
-    losses = []
+    unsup_losses, sup_losses, losses = [], [], []
     consis_losses, diversity_losses, total_losses = [], [], []
     for idx in range(num_iters):  # iterate over batches of dataloader
         try:
@@ -58,80 +58,86 @@ def training_paradigm(epoch, model, loss_func, graph,
                                                     normal_th=config['normal-th'],
                                                     fraud_th=config['fraud-th'])  # (8) get high-quality nodes
 
+        if epoch > config['warm-up']:
+            model.train()
+            attn_drop.train()
+
+            ### --- Optimize learnable data augmentation modules - Freeze the model optimization --- ###
+            for param in model.parameters():
+                param.requires_grad = False
+            for param in attn_drop.parameters():
+                param.requires_grad = True
+
+            # add some stochastic noise at the input state
+            _, _, u_blocks = fixed_augmentation(graph, unlabel_idx.to(
+                config['device']), sampler, aug_type='None')
+
+            # calculate the embeddings
+            inter_results = model(
+                u_blocks, update_bn=False, return_logits=True)
+            dropped_results = [inter_results[0]]
+            for i in range(1, len(inter_results)):
+                # apply the learnable data augmentation (masking)
+                dropped_results.append(attn_drop(inter_results[i]))
+
+            h = torch.stack(dropped_results, dim=1)
+            h = h.reshape(h.shape[0], -1)
+            logits = model.proj_out(h)  # (13) conduct logits prediction
+            u_pred = logits.log_softmax(dim=-1)
+
+            # (14) calculate the consistency loss
+            consistency_loss = nll_loss(
+                u_pred, pseudo_labels, pos_w=1.0, reduction='none', device=config['device'])
+            consistency_loss = torch.mean(torch.tensor(consistency_loss) * u_mask)
+            
+            # (14) calculate the diversity loss
+            diversity_loss = F.pairwise_distance(weak_h, h)
+            diversity_loss = torch.mean(diversity_loss * u_mask)
+
+            # (15) total loss of the learnable data augmentation module + regularization
+            total_loss = config['consis-weight'] * consistency_loss - \
+                diversity_loss + config['trainable-weight-decay'] * \
+                l2_regularization(attn_drop)
+            
+            consis_losses.append(consistency_loss.item())
+            diversity_losses.append(diversity_loss.item())
+            total_losses.append(total_loss.item())
+
+            ad_optim.zero_grad()
+            total_loss.backward()
+            ad_optim.step()
+
+            ### --- Optimize the model - Freeze the learnable data augmentation module --- ###
+            for param in model.parameters():
+                param.requires_grad = True
+            for param in attn_drop.parameters():
+                param.requires_grad = False
+
+            # (17) calculate the embeddings
+            inter_results = model(
+                u_blocks, update_bn=False, return_logits=True)
+            dropped_results = [inter_results[0]]
+
+            # calculate embeddings of the augmented data
+            for i in range(1, len(inter_results)):
+                # freeze the optimization of the learnable data augmentation module
+                dropped_results.append(
+                    attn_drop(inter_results[i], in_eval=True))
+
+            h = torch.stack(dropped_results, dim=1)
+            h = h.reshape(h.shape[0], -1)
+            logits = model.proj_out(h)
+            u_pred = logits.log_softmax(dim=-1)
+
+            unsup_loss = nll_loss(
+                u_pred, pseudo_labels, pos_w=1.0, reduction='none', device=config['device'])
+            # consistency loss (eq3) in the framework
+            unsup_loss = torch.mean(torch.tensor(unsup_loss) * u_mask)
+        
+        else:
+            unsup_loss = 0.0
+
         model.train()
-        attn_drop.train()
-
-        ### --- Optimize learnable data augmentation modules - Freeze the model optimization --- ###
-        for param in model.parameters():
-            param.requires_grad = False
-        for param in attn_drop.parameters():
-            param.requires_grad = True
-
-        # add some stochastic noise at the input state
-        _, _, u_blocks = fixed_augmentation(graph, unlabel_idx.to(
-            config['device']), sampler, aug_type='drophidden')
-
-        # calculate the embeddings
-        inter_results = model(
-            u_blocks, update_bn=False, return_logits=True)
-        dropped_results = [inter_results[0]]
-        for i in range(1, len(inter_results)):
-            # apply the learnable data augmentation (masking)
-            dropped_results.append(attn_drop(inter_results[i]))
-
-        h = torch.stack(dropped_results, dim=1)
-        h = h.reshape(h.shape[0], -1)
-        logits = model.proj_out(h)  # (13) conduct logits prediction
-        u_pred = logits.log_softmax(dim=-1)
-
-        # (14) calculate the consistency loss
-        consistency_loss = nll_loss(
-            u_pred, pseudo_labels, pos_w=1.0, reduction='none', device=config['device'])
-        consistency_loss = torch.mean(torch.tensor(consistency_loss) * u_mask)
-        
-        # (14) calculate the diversity loss
-        diversity_loss = F.pairwise_distance(weak_h, h)
-        diversity_loss = torch.mean(diversity_loss * u_mask)
-
-        # (15) total loss of the learnable data augmentation module + regularization
-        total_loss = config['consis-weight'] * consistency_loss - \
-            diversity_loss + config['trainable-weight-decay'] * \
-            l2_regularization(attn_drop)
-        
-        consis_losses.append(consistency_loss.item())
-        diversity_losses.append(diversity_loss.item())
-        total_losses.append(total_loss.item())
-
-        ad_optim.zero_grad()
-        total_loss.backward()
-        ad_optim.step()
-
-        ### --- Optimize the model - Freeze the learnable data augmentation module --- ###
-        for param in model.parameters():
-            param.requires_grad = True
-        for param in attn_drop.parameters():
-            param.requires_grad = False
-
-        # (17) calculate the embeddings
-        inter_results = model(
-            u_blocks, update_bn=False, return_logits=True)
-        dropped_results = [inter_results[0]]
-
-        # calculate embeddings of the augmented data
-        for i in range(1, len(inter_results)):
-            # freeze the optimization of the learnable data augmentation module
-            dropped_results.append(
-                attn_drop(inter_results[i], in_eval=True))
-
-        h = torch.stack(dropped_results, dim=1)
-        h = h.reshape(h.shape[0], -1)
-        logits = model.proj_out(h)
-        u_pred = logits.log_softmax(dim=-1)
-
-        unsup_loss = nll_loss(
-            u_pred, pseudo_labels, pos_w=1.0, reduction='none', device=config['device'])
-        # consistency loss (eq3) in the framework
-        unsup_loss = torch.mean(torch.tensor(unsup_loss) * u_mask)
 
         _, _, s_blocks = fixed_augmentation(graph, label_idx.to(
             config['device']), sampler, aug_type='none')  # sample blocks of labeled nodes
@@ -140,6 +146,8 @@ def training_paradigm(epoch, model, loss_func, graph,
 
         # (19) CE loss on labeled nodes
         sup_loss = loss_func(s_pred, s_target)
+        # unsup_losses.append(unsup_loss.item())
+        sup_losses.append(sup_loss.item())
 
         loss = sup_loss + unsup_loss + \
             config['weight-decay'] * l2_regularization(model)
@@ -150,17 +158,11 @@ def training_paradigm(epoch, model, loss_func, graph,
         loss.backward()
         optimizer.step()
 
-    ## logs
-    mean_consis = sum(consis_losses) / len(consis_losses)
-    mean_diversity = sum(diversity_losses) / len(diversity_losses)
-    mean_total = sum(total_losses) / len(total_losses)
-
-    print(f"Consistency aug loss: {mean_consis}\nDiversity training loss: {mean_diversity}\nTotal training loss: {mean_total}")
-    wandb.log({'train-augconsis-loss': mean_consis,
-                    'train-diversity-loss': mean_diversity,
-                    'train-total-loss': mean_total})
-        
+    mean_sup = sum(sup_losses) / len(sup_losses)
     mean_loss = sum(losses) / len(losses)
+    # print(f"Unsupervised training loss: {mean_unsup}\nSupervised training loss: {mean_sup}")
     print(f"Consistency training loss: {mean_loss}")
-    wandb.log({'train-consis-loss': mean_loss})
+    wandb.log({'train-consis-loss': mean_loss,
+            #    'train-unsup-loss': mean_unsup,
+               'train-sup-loss': mean_sup})
 
