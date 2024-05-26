@@ -1,6 +1,6 @@
 import torch
 
-def high_quality_nodes(logits: torch.tensor, normal_th: float = 0.05, fraud_th: float = 0.85):
+def high_quality_nodes(logits: torch.tensor, normal_th: float = 0.05, fraud_th: float = 0.85, high_quality_node: bool = True):
     # prediction of the model
     #u_pred_log.shape = (192, 2)
     u_pred_log = logits.log_softmax(dim=-1)
@@ -21,7 +21,11 @@ def high_quality_nodes(logits: torch.tensor, normal_th: float = 0.05, fraud_th: 
 
     # u_mask: set of high-quality nodes
     # 1 node is considered high-quality if and only if p(normal) >= 0.95 or p(abnormal) >= 0.85
-    u_mask = torch.logical_or(neg_tar, pos_tar)
+    if high_quality_node:
+        u_mask = torch.logical_or(neg_tar, pos_tar)
+    else:
+        u_mask = torch.ones_like(u_pred).bool()
+        
     return pseudo_labels, u_mask
 
 class EarlyStopper:
