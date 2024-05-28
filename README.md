@@ -22,12 +22,11 @@ python3 main.py
 ## Results
 Configuration details used for training the model can be found in `config.yaml`. The model is trained on CPU and the whole training process takes approximately 30 minutes, proving its efficiency and lightweightness. The comparison of the results with the paper is as follows:
 
-| Metric | Paper | Ours |
-| --- | --- | --- |
-| AUC-ROC | 93.91 | 91.897 |
-| AUC-PR | 83.33 | 79.98 |
-| Macro-F1 | 90.03 | 88.67 |
-| Loss | - | 0.153 |
+| Metric | Paper | Ours (training on high-quality nodes) | Ours (training on full unlabeled nodes) |
+| --- | --- | --- | --- |
+| AUC-ROC | 93.91 | 91.897 | 91.95 |
+| AUC-PR | 83.33 | 79.98 | 80.17 |
+| Macro-F1 | 90.03 | 88.67 | 88.72 |
 
 Plots of the training and validation loss curves and metrics can be found in folder `logs/`.
 
