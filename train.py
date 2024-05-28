@@ -56,7 +56,8 @@ def training_paradigm(epoch, model, loss_func, graph,
 
         pseudo_labels, u_mask = high_quality_nodes(logits=weak_logits,
                                                     normal_th=config['normal-th'],
-                                                    fraud_th=config['fraud-th'])  # (8) get high-quality nodes
+                                                    fraud_th=config['fraud-th'],
+                                                    high_quality_node=config['high-quality-node'])  # (8) get high-quality nodes
 
         if epoch > config['warm-up']:
             model.train()

@@ -33,3 +33,4 @@ model-path: "./output"
 seed: 42
 early-stop: True
 warm-up: -1
+high-quality-node: False
